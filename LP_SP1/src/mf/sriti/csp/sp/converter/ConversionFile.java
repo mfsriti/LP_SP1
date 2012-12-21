@@ -43,9 +43,9 @@ public class ConversionFile {
 	
 	public void convert() throws GeneralException{
 		String currentLine = null;
+		System.out.println("ConversionFile.ConversionFile(): processing file: "+ mProblemName);
 		while ((currentLine = mSourceFile.nextLine()) != null ) {
 			processLine(currentLine);
-			
 		}
 		mSourceFile.close();
 		mTargetOldFile.close();
