@@ -8,17 +8,19 @@ import mf.sriti.csp.sp.util.FileHandler;
 import mf.sriti.csp.sp.util.GeneralException;
 
 public class ConversionFile {
-	FileHandler mSourceFile = null;
-	FileHandler mTargetOldFile = null;
-	FileHandler mTargetNewFile = null;
+	FileHandler mTemplateFile = null;
+	FileHandler mSATPREFFiles[] = null;
+	FileHandler mLPSolveFiles[] = null;
 	
 	String mProblemName = "";
 
 	int mProblemVariableNumber = 0;
 	int mPrefsLiteralNumber = 0;
 	int mConstraintsCounter = 0;
-	
 	public ConversionFile(File file) throws ConversionException, GeneralException{
+		this(file, 0, 1, 100);
+	}
+	public ConversionFile(File file, int nbPrefLiterals, int nbOutFile, int percentage) throws ConversionException, GeneralException{
 		ConversionManager cm = ConversionManager.getInstance();
 		if (cm==null)
 			throw new ConversionException("ConversionFile: ConversionManager singleton is NULL");
@@ -27,44 +29,55 @@ public class ConversionFile {
 		if (cph==null)
 			throw new ConversionException("ConversionFile: ConversionPropertiesHandler not initialized yet.");
 		
-		mSourceFile = new FileHandler(file, true);
+		mPrefsLiteralNumber = nbPrefLiterals;
+		mTemplateFile = new FileHandler(file, true);
 		mProblemName = file.getName();
-		String sourceName = file.getAbsolutePath();
-		String targetOldName = sourceName.replace(cph.getSourceDir(), cph.getTargetOldDir());
-		String targetNewName = sourceName.replace(cph.getSourceDir(), cph.getTargetNewDir());
-		// change file extension for target new
-		targetNewName = targetNewName.substring(0,targetNewName.lastIndexOf('.')+1) + LP_FILE_EXT;
-		//System.out.println(sourceName);
-		//System.out.println(targetOldName);
-		//System.out.println(targetNewName);
-		mTargetOldFile = new FileHandler(targetOldName, false);
-		mTargetNewFile = new FileHandler(targetNewName, false);
+		String templateName = file.getAbsolutePath();
+		String satprefFileName = templateName.replace(cph.getTemplateDir(), cph.getSATPREFDir());
+		String lpsolveFileName = templateName.replace(cph.getTemplateDir(), cph.getLPSolveDir());
+		// change file extensions
+		// gen-200var-800cl-pb0-total-pref20-ran0
+		String commonPartFileName = COMMON_FILE_PART_SEP + COMMON_FILE_PART_PREF;
+		satprefFileName = satprefFileName.substring(0,satprefFileName.lastIndexOf('.')) + commonPartFileName;
+		lpsolveFileName = lpsolveFileName.substring(0,lpsolveFileName.lastIndexOf('.')) + commonPartFileName;
+		
+		int totalFileSize =  (100/percentage) * nbOutFile;
+		mSATPREFFiles = new FileHandler[totalFileSize];
+		mLPSolveFiles = new FileHandler[totalFileSize];
+
+        for (int i=0; i<totalFileSize; i++){
+        		String randStr = COMMON_FILE_PART_PERCENT + COMMON_FILE_PART_SEP + COMMON_FILE_PART_RAND;
+        		mSATPREFFiles[i] = new FileHandler(satprefFileName+ (i/nbOutFile+1)*(nbPrefLiterals*percentage)/100 + COMMON_FILE_PART_SEP + (i/nbOutFile+1)*percentage + randStr + i%nbOutFile + "." + SATPREF_FILE_EXT, false);
+        		mLPSolveFiles[i] = new FileHandler(lpsolveFileName+ (i/nbOutFile+1)*(nbPrefLiterals*percentage)/100 + COMMON_FILE_PART_SEP + (i/nbOutFile+1)*percentage + randStr + i%nbOutFile + "." + LP_SOLVE_FILE_EXT, false);
+        }
+	  
 	}
+	
 	
 	public void convert() throws GeneralException{
 		String currentLine = null;
 		System.out.println("ConversionFile.ConversionFile(): processing file: "+ mProblemName);
-		while ((currentLine = mSourceFile.nextLine()) != null ) {
+		while ((currentLine = mTemplateFile.nextLine()) != null ) {
 			processLine(currentLine);
 		}
-		mSourceFile.close();
-		mTargetOldFile.close();
-		mTargetNewFile.close();
+		mTemplateFile.close();
+		for (int i=0; i<mSATPREFFiles.length; i++){
+			mSATPREFFiles[i].close();
+			mLPSolveFiles[i].close();
+		}
 	}
 	
 	private void processLine(String line) throws ConversionException, GeneralException{
-		// for the old target file, we print the following line as they are:
+		// for the SATPREF file, we print the following line as they are:
 		//  -contains only "c"  -equals to "c preferences"     
 		if ( line.equals("c") || line.equals("c preferences") ){
-			writeToTargetOld(line);
-			// for targetnewfile, nothing to do
+			writeToSATPREF(line);
+			// for lpsolve, nothing to do
 		} else if (line.isEmpty()){
-			writeToTargetOld(line);
-			writeToTargetNew(LP_TERM_BOUNDS);
-			writeToTargetNew(generateBoundsSection());
-			writeToTargetNew(LP_TERM_INTEGER);
-			writeToTargetNew(generateIntegersSection());
-		    writeToTargetNew(LP_TERM_END);
+			writeToSATPREF(line);
+			writeToLPSolve("");
+			writeToLPSolve(LP_SOLVE_TERM_BIN);
+			writeToLPSolve(generateIntegersSection());
 		} else{
 			switch(line.charAt(0)){
 			case 'c':
@@ -72,9 +85,8 @@ public class ConversionFile {
 					String a[]=line.split(" ");
 					mProblemVariableNumber = Integer.parseInt(a[2]);
 					mPrefsLiteralNumber = Integer.parseInt(a[3]);
-					writeToTargetOld(line);
-					writeToTargetNew(LP_TERM_PROBLEM);
-					writeToTargetNew(" "+mProblemName);
+					writeToSATPREF(line);
+					writeToLPSolve(LP_SOLVE_TERM_MAX+":");
 				} else { // here it remains only the list of pref line: "c 84<-29, 135<-29, -169<-185, 82<16, ..."
 					if (mProblemVariableNumber<=0 || mPrefsLiteralNumber<=0)
 						throw new ConversionException("CobnversionFile.processLine: either problemVariableNumber or prefsLiteralNumber is not set properly");
@@ -84,17 +96,15 @@ public class ConversionFile {
 					// generate prefs
 					String prefsString = generatePreferences(prefsLiterals);
 					// write the prefs string into the file
-					writeToTargetOld(prefsString);
-					
+					writeToSATPREF(prefsString);
 					// generate objective function
 					String objFunction = generateObjFunction(prefsLiterals);
-					writeToTargetNew(LP_TERM_MAXIMIZE);
-					writeToTargetNew(" "+LP_TERM_OBJ+": "+ objFunction);
+					writeToLPSolve( objFunction);
+					writeToLPSolve("");
 				}
 				break;
 			case 'p': // line.startsWith("p cnf")
-				writeToTargetOld(line);
-				writeToTargetNew(LP_TERM_SUBJECTTO);
+				writeToSATPREF(line);
 			    break;
 			case '-':
 			case '0':
@@ -107,7 +117,7 @@ public class ConversionFile {
 			case '7':
 			case '8':
 			case '9':
-				writeToTargetOld(line);
+				writeToSATPREF(line);
 				
 				String strConstraint[] = line.split(" ");
 				int intConstraint[] = new int [strConstraint.length-1];
@@ -115,7 +125,7 @@ public class ConversionFile {
 					intConstraint[i] = Integer.parseInt(strConstraint[i]);
 				
 				String constraint = generateConstraints(intConstraint);
-				writeToTargetNew(" "+LP_TERM_RULE+ ++mConstraintsCounter + ":  "+constraint);
+				writeToLPSolve(LP_SOLVE_TERM_CONSTRAINT+ ++mConstraintsCounter + ":  "+constraint);
 				break;
 			default: ;
 				
@@ -123,12 +133,19 @@ public class ConversionFile {
 		}
 	}
 	
-	private void writeToTargetOld(String line) throws GeneralException{
-		mTargetOldFile.writeLine(line);
+	private void writeToFile(String line, FileHandler file)  throws GeneralException {
+		file.writeLine(line);
 	}
 	
-	private void writeToTargetNew(String line) throws GeneralException{
-		mTargetNewFile.writeLine(line);
+	private void writeToSATPREF(String line) throws GeneralException {
+		for (int i=0; i<mSATPREFFiles.length; i++)
+			writeToFile(line, mSATPREFFiles[i]);
+	}
+	
+	private void writeToLPSolve(String line) throws GeneralException{
+		for (int i=0; i<mLPSolveFiles.length; i++){
+			writeToFile(line, mLPSolveFiles[i]);
+		}
 	}
 	
 	private int[] generatePrefsLiterals(int nbVariables, int nbLiterals){
@@ -199,31 +216,23 @@ public class ConversionFile {
 		result += ">=" + (1 - negatives);
 		return result;
 	}
-	
-	private String generateBoundsSection(){
-		String result = "";
-		for (int i=1; i <= mProblemVariableNumber; i++)
-			result += " 0 <= " + "x" + i + " <= 1\n";
-		result = result.substring(0, result.length()-1);
-		return result;
-	}
-	
+		
 	private String generateIntegersSection(){
 		String result = "";
 		for (int i=1; i<=mProblemVariableNumber; i++)
-			result += " x" + i;
+			result += " x" + i +", ";
+		result = result.substring(0, result.length() - 2);
+		result +=";";
 		return result;
 	}
 
-	private final static String LP_TERM_PROBLEM = "Problem";
-	private final static String LP_TERM_MAXIMIZE = "Maximize";
-	private final static String LP_TERM_OBJ = "obj";
-	private final static String LP_TERM_SUBJECTTO = "Subject To";
-	private final static String LP_TERM_RULE = "r";
-	private final static String LP_TERM_INTEGER = "Integer";
-	private final static String LP_TERM_BOUNDS = "Bounds";
-	private final static String LP_TERM_END = "End";
-	private final static String LP_FILE_EXT = "lp";
-	
-	
+	private final static String LP_SOLVE_TERM_MAX = "max";
+	private final static String LP_SOLVE_TERM_BIN = "bin";
+	private final static String LP_SOLVE_TERM_CONSTRAINT = "C";
+	private final static String LP_SOLVE_FILE_EXT = "lp";
+	private final static String SATPREF_FILE_EXT = "noptsat";	
+	private final static String COMMON_FILE_PART_PREF = "pref";
+	private final static String COMMON_FILE_PART_RAND = "rand";
+	private final static String COMMON_FILE_PART_PERCENT = "%";
+	private final static String COMMON_FILE_PART_SEP = "-";
 }

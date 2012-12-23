@@ -19,17 +19,17 @@ public class ConversionManager {
 	
 	private ConversionManager() throws GeneralException {
 		mProps = new ConversionPropertiesHandler();
-		System.out.println("Source directory: "+mProps.getSourceDir());
-		System.out.println("Target_Old directory: "+mProps.getTargetOldDir());
-		System.out.println("Target_New directory: "+mProps.getTargetNewDir());
+		System.out.println("Source directory: "+mProps.getTemplateDir());
+		System.out.println("Target_Old directory: "+mProps.getSATPREFDir());
+		System.out.println("Target_New directory: "+mProps.getLPSolveDir());
 	}
 	public void process(){
 		//1- parcourir les sous dossier source
 		try {
-			List<File> files = new FileHandler(mProps.getSourceDir()).listChildren(true);
+			List<File> files = new FileHandler(mProps.getTemplateDir()).listChildren(true);
 			Iterator<File> it = files.iterator();
 			while(it.hasNext()){
-				ConversionFile cf = new ConversionFile((File)it.next());
+				ConversionFile cf = new ConversionFile((File)it.next(), 200, 10, 10);
 				cf.convert();
 			}
 			
