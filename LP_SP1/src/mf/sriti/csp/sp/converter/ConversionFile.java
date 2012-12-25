@@ -8,38 +8,40 @@ import mf.sriti.csp.sp.util.FileHandler;
 import mf.sriti.csp.sp.util.GeneralException;
 
 public class ConversionFile {
-	FileHandler mTemplateFile = null;
-	FileHandler mSATPREFFiles[] = null;
-	FileHandler mLPSolveFiles[] = null;
 	
-	String mProblemName = "";
-
-	int mProblemVariableNumber = 0;
-	int mPrefsLiteralNumber = 0;
-	int mConstraintsCounter = 0;
-	public ConversionFile(File file) throws ConversionException, GeneralException{
-		this(file, 0, 1, 100);
-	}
-	public ConversionFile(File file, int nbPrefLiterals, int nbOutFile, int percentage) throws ConversionException, GeneralException{
+	String mTemplateFileName = "";
+	String mSATPREFFileName = "";
+	String mLPSolveFileName = "";
+	
+	FileHandler mTemplateFile = null;
+	FileHandler mSATPREFFile = null;
+	FileHandler mLPSolveFile = null;
+	
+	int mPercentagePreferences = 0;
+	int mNumberOutputFiles = 0;
+	int mCounterConstraints = 0;
+	int mNumberProblemVariables = 0;
+	int mNumberPreferenceVariables = 0;
+	
+	public ConversionFile(File file) throws ConversionException, GeneralException{	
 		ConversionManager cm = ConversionManager.getInstance();
 		if (cm==null)
 			throw new ConversionException("ConversionFile: ConversionManager singleton is NULL");
-		
 		ConversionPropertiesHandler cph = cm.getProps();
 		if (cph==null)
 			throw new ConversionException("ConversionFile: ConversionPropertiesHandler not initialized yet.");
 		
-		mPrefsLiteralNumber = nbPrefLiterals;
-		mTemplateFile = new FileHandler(file, true);
-		mProblemName = file.getName();
-		String templateName = file.getAbsolutePath();
-		String satprefFileName = templateName.replace(cph.getTemplateDir(), cph.getSATPREFDir());
-		String lpsolveFileName = templateName.replace(cph.getTemplateDir(), cph.getLPSolveDir());
-		// change file extensions
-		// gen-200var-800cl-pb0-total-pref20-ran0
-		String commonPartFileName = COMMON_FILE_PART_SEP + COMMON_FILE_PART_PREF;
-		satprefFileName = satprefFileName.substring(0,satprefFileName.lastIndexOf('.')) + commonPartFileName;
-		lpsolveFileName = lpsolveFileName.substring(0,lpsolveFileName.lastIndexOf('.')) + commonPartFileName;
+		mTemplateFileName = file.getAbsolutePath();
+		String commonName = mTemplateFileName.substring(0,mTemplateFileName.lastIndexOf('.')) + COMMON_FILE_PART_SEP + COMMON_FILE_PART_PREF;
+		mSATPREFFileName = commonName.replace(cph.getTemplateDir(), cph.getSATPREFDir());
+		mLPSolveFileName = commonName.replace(cph.getTemplateDir(), cph.getLPSolveDir());
+		
+		mPercentagePreferences = cph.getNbOutput();
+		mNumberOutputFiles = cph.getPercentage();
+	}
+	
+/*	private void generateFiles(String originePath, int nbPrefLiterals, int nbOutFile, int percentage) throws ConversionException, GeneralException{
+		
 		
 		int totalFileSize =  (100/percentage) * nbOutFile;
 		mSATPREFFiles = new FileHandler[totalFileSize];
@@ -47,26 +49,50 @@ public class ConversionFile {
 
         for (int i=0; i<totalFileSize; i++){
         		String randStr = COMMON_FILE_PART_PERCENT + COMMON_FILE_PART_SEP + COMMON_FILE_PART_RAND;
-        		mSATPREFFiles[i] = new FileHandler(satprefFileName+ (i/nbOutFile+1)*(nbPrefLiterals*percentage)/100 + COMMON_FILE_PART_SEP + (i/nbOutFile+1)*percentage + randStr + i%nbOutFile + "." + SATPREF_FILE_EXT, false);
-        		mLPSolveFiles[i] = new FileHandler(lpsolveFileName+ (i/nbOutFile+1)*(nbPrefLiterals*percentage)/100 + COMMON_FILE_PART_SEP + (i/nbOutFile+1)*percentage + randStr + i%nbOutFile + "." + LP_SOLVE_FILE_EXT, false);
+        		mSATPREFFiles[i] = new FileHandler(satprefFileName+ (i/nbOutFile+1)*(mProblemVariableNumber*percentage)/100 + COMMON_FILE_PART_SEP + (i/nbOutFile+1)*percentage + randStr + i%nbOutFile + "." + SATPREF_FILE_EXT, false);
+        		mLPSolveFiles[i] = new FileHandler(lpsolveFileName+ (i/nbOutFile+1)*(mProblemVariableNumber*percentage)/100 + COMMON_FILE_PART_SEP + (i/nbOutFile+1)*percentage + randStr + i%nbOutFile + "." + LP_SOLVE_FILE_EXT, false);
         }
-	  
 	}
 	
-	
-	public void convert() throws GeneralException{
-		String currentLine = null;
-		System.out.println("ConversionFile.ConversionFile(): processing file: "+ mProblemName);
-		while ((currentLine = mTemplateFile.nextLine()) != null ) {
-			processLine(currentLine);
+	*/
+	public void convert() throws GeneralException {
+		System.out.println("ConversionFile.ConversionFile(): processing file: "+ mTemplateFileName);
+		extractNumberProblemVarialbles();
+		int totalFileSize =  (100/mPercentagePreferences) * mNumberOutputFiles;
+        for (int i=0; i<totalFileSize; i++){
+        	initConversion(i);
+        	String currentLine = null;
+			while ((currentLine = mTemplateFile.nextLine()) != null ) {
+				processLine(currentLine);
+			}
+			finalizeConversion();	
 		}
+	
+	}
+	
+	private void initConversion(int index) throws GeneralException {
+		String randStr = COMMON_FILE_PART_PERCENT + COMMON_FILE_PART_SEP + COMMON_FILE_PART_RAND;
+    	mNumberPreferenceVariables = (index/mNumberOutputFiles+1)*((mNumberProblemVariables*mPercentagePreferences)/100);
+    	mSATPREFFile = new FileHandler(mSATPREFFileName+ mNumberPreferenceVariables + COMMON_FILE_PART_SEP + (index/mNumberOutputFiles+1)*mPercentagePreferences + randStr + index%mNumberOutputFiles + "." + SATPREF_FILE_EXT, false);
+    	mLPSolveFile = new FileHandler(mLPSolveFileName+ mNumberPreferenceVariables + COMMON_FILE_PART_SEP + (index/mNumberOutputFiles+1)*mPercentagePreferences + randStr + index%mNumberOutputFiles + "." + LP_SOLVE_FILE_EXT, false);
+    	
+    	mTemplateFile = new FileHandler(mTemplateFileName, true);
+		mCounterConstraints = 0;
+	}
+	
+	private void finalizeConversion() throws GeneralException {
 		mTemplateFile.close();
-		for (int i=0; i<mSATPREFFiles.length; i++){
-			mSATPREFFiles[i].close();
-			mLPSolveFiles[i].close();
-		}
+		mSATPREFFile.close();
+		mLPSolveFile.close();
 	}
-	
+
+	private void extractNumberProblemVarialbles() throws GeneralException {
+		mTemplateFile = new FileHandler(mTemplateFileName, true);
+		mTemplateFile.nextLine();
+		String a[]=mTemplateFile.nextLine().split(" ");
+		mNumberProblemVariables = Integer.parseInt(a[2]);
+		mTemplateFile.close();
+	}
 	private void processLine(String line) throws ConversionException, GeneralException{
 		// for the SATPREF file, we print the following line as they are:
 		//  -contains only "c"  -equals to "c preferences"     
@@ -77,21 +103,18 @@ public class ConversionFile {
 			writeToSATPREF(line);
 			writeToLPSolve("");
 			writeToLPSolve(LP_SOLVE_TERM_BIN);
-			writeToLPSolve(generateIntegersSection());
+			writeToLPSolve(generateBinarySection());
 		} else{
 			switch(line.charAt(0)){
 			case 'c':
 				if (line.startsWith("c S")) {//we process the line contains variable counters, ex: "c S 200 50"
-					String a[]=line.split(" ");
-					mProblemVariableNumber = Integer.parseInt(a[2]);
-					mPrefsLiteralNumber = Integer.parseInt(a[3]);
-					writeToSATPREF(line);
+					writeToSATPREF(line + " "+ mNumberPreferenceVariables);
 					writeToLPSolve(LP_SOLVE_TERM_MAX+":");
 				} else { // here it remains only the list of pref line: "c 84<-29, 135<-29, -169<-185, 82<16, ..."
-					if (mProblemVariableNumber<=0 || mPrefsLiteralNumber<=0)
+					if (mNumberProblemVariables<=0 || mNumberPreferenceVariables<=0)
 						throw new ConversionException("CobnversionFile.processLine: either problemVariableNumber or prefsLiteralNumber is not set properly");
 					// generate randomly prefs literals from problem variables
-					int prefsLiterals[] = generatePrefsLiterals(mProblemVariableNumber, mPrefsLiteralNumber);
+					int prefsLiterals[] = generatePrefsLiterals(mNumberProblemVariables, mNumberPreferenceVariables);
 					
 					// generate prefs
 					String prefsString = generatePreferences(prefsLiterals);
@@ -99,7 +122,7 @@ public class ConversionFile {
 					writeToSATPREF(prefsString);
 					// generate objective function
 					String objFunction = generateObjFunction(prefsLiterals);
-					writeToLPSolve( objFunction);
+					writeToLPSolve(objFunction);
 					writeToLPSolve("");
 				}
 				break;
@@ -124,8 +147,8 @@ public class ConversionFile {
 				for (int i=0; i<strConstraint.length-1; i++)
 					intConstraint[i] = Integer.parseInt(strConstraint[i]);
 				
-				String constraint = generateConstraints(intConstraint);
-				writeToLPSolve(LP_SOLVE_TERM_CONSTRAINT+ ++mConstraintsCounter + ":  "+constraint);
+				String constraint = generateConstraint(intConstraint);
+				writeToLPSolve(LP_SOLVE_TERM_CONSTRAINT+ ++mCounterConstraints + ":  "+constraint);
 				break;
 			default: ;
 				
@@ -133,19 +156,16 @@ public class ConversionFile {
 		}
 	}
 	
-	private void writeToFile(String line, FileHandler file)  throws GeneralException {
+	private void writeToFile(FileHandler file, String line)  throws GeneralException {
 		file.writeLine(line);
 	}
 	
 	private void writeToSATPREF(String line) throws GeneralException {
-		for (int i=0; i<mSATPREFFiles.length; i++)
-			writeToFile(line, mSATPREFFiles[i]);
+			writeToFile(mSATPREFFile, line);
 	}
 	
 	private void writeToLPSolve(String line) throws GeneralException{
-		for (int i=0; i<mLPSolveFiles.length; i++){
-			writeToFile(line, mLPSolveFiles[i]);
-		}
+			writeToFile(mLPSolveFile, line);
 	}
 	
 	private int[] generatePrefsLiterals(int nbVariables, int nbLiterals){
@@ -191,11 +211,12 @@ public class ConversionFile {
 			result = result.substring(3, result.length());
 		else // if (result.startsWith(" - "))
 			result = "-" + result.substring(3, result.length());
-			
+		
+		result +=";";
 		return result;
 	}
 	
-	private String generateConstraints(int constraint[] ){
+	private String generateConstraint(int constraint[] ){
 		String result = "";
 		String space="";
 		int negatives = 0;
@@ -213,13 +234,15 @@ public class ConversionFile {
 		
 		if (result.startsWith("+"))
 			result = result.substring(1, result.length());
-		result += ">=" + (1 - negatives);
+		result += " >= " + (1 - negatives);
+		
+		result +=";";
 		return result;
 	}
 		
-	private String generateIntegersSection(){
+	private String generateBinarySection(){
 		String result = "";
-		for (int i=1; i<=mProblemVariableNumber; i++)
+		for (int i=1; i<=mNumberProblemVariables; i++)
 			result += " x" + i +", ";
 		result = result.substring(0, result.length() - 2);
 		result +=";";

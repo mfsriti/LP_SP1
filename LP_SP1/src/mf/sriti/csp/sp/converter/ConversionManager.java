@@ -29,7 +29,7 @@ public class ConversionManager {
 			List<File> files = new FileHandler(mProps.getTemplateDir()).listChildren(true);
 			Iterator<File> it = files.iterator();
 			while(it.hasNext()){
-				ConversionFile cf = new ConversionFile((File)it.next(), 200, 10, 10);
+				ConversionFile cf = new ConversionFile((File)it.next());
 				cf.convert();
 			}
 			

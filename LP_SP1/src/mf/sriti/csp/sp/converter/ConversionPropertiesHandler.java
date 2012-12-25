@@ -22,8 +22,18 @@ public class ConversionPropertiesHandler extends PropertiesHandler {
 	public String getLPSolveDir() {
 		return getProperty(CSP_SP_TARGET_LPSOLVE_DIR);
 	}
+	
+	public int getNbOutput() {
+		return getIntProperty(CSP_SP_PREF_NBOUTPUT);
+	}
+	
+	public int getPercentage() {
+		return getIntProperty(CSP_SP_PREF_PERCENTAGE);
+	}
 
 	public static final String CSP_SP_TEMPLATE_DIR = "csp.sp.template.dir";
 	public static final String CSP_SP_TARGET_SATPREF_DIR = "csp.sp.target.satpref.dir";
 	public static final String CSP_SP_TARGET_LPSOLVE_DIR = "csp.sp.target.lpsolve.dir";
+	public static final String CSP_SP_PREF_NBOUTPUT = "csp.sp.pref.nboutput";
+	public static final String CSP_SP_PREF_PERCENTAGE="csp.sp.pref.percentage";
 }

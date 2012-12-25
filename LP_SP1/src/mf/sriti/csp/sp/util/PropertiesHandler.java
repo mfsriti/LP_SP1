@@ -77,4 +77,8 @@ private static String escapifyStr(String str)
 	public String getProperty(String prop) {
 		return properties.getProperty(prop);
 	}
+	
+	public int getIntProperty(String prop) {
+		return Integer.parseInt(properties.getProperty(prop));
+	}
 }
